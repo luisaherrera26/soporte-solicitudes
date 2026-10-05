@@ -9,6 +9,7 @@ const usuarios = [
   ['agente02', 'Agente', 'Inactivo'],
   ['coordinador01', 'Coordinador', 'Activo'],
   ['auditor01', 'Auditor', 'Activo'],
+  ['solicitante02', 'Solicitante', 'Activo'],
 ];
 
 (async () => {
