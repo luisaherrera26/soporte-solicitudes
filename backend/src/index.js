@@ -5,6 +5,7 @@ const pool = require('./db');
 const authRoutes = require('./routes/auth');
 const { requiereRol } = require('./middleware/auth');
 const solicitudesRoutes = require('./routes/solicitudes');
+const coordinacionRoutes = require('./routes/coordinacion');
 
 const app = express();
 app.use(express.json());
@@ -17,6 +18,7 @@ app.use(session({
 
 app.get('/salud', (req, res) => res.json({ estado: 'ok' }));
 app.use('/api/solicitudes', solicitudesRoutes);
+app.use('/api/coordinacion', coordinacionRoutes);
 
 app.get('/salud-bd', async (req, res) => {
   try {
