@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soporte interno</title>
+<style>
+:root{--fondo:#eef2f1;--panel:#fff;--tinta:#1d2b2a;--suave:#5b6b69;--linea:#cfdad8;--marca:#0f6b62;--marca-osc:#0a4d46;--error:#a8321f;--ok:#1f7a45}
+@media (prefers-color-scheme:dark){:root{--fondo:#121a19;--panel:#1a2524;--tinta:#e6efee;--suave:#9bb0ad;--linea:#2c3d3b;--marca:#3fb5a8;--marca-osc:#2d9387}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+header{background:var(--marca-osc);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+header h1{margin:0;font-size:1.15rem;font-weight:600}
+main{max-width:900px;margin:24px auto;padding:0 16px;display:grid;gap:20px}
+section{background:var(--panel);border:1px solid var(--linea);border-radius:8px;padding:20px}
+h2{margin:0 0 14px;font-size:1.1rem}
+label{display:block;font-weight:600;margin:12px 0 4px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--linea);border-radius:6px;font:inherit;background:var(--panel);color:var(--tinta)}
+textarea{min-height:90px;resize:vertical}
+button{font:inherit;padding:9px 16px;border:0;border-radius:6px;background:var(--marca);color:#fff;font-weight:600;cursor:pointer}
+button:hover{background:var(--marca-osc)}
+button.sec{background:transparent;color:inherit;border:1px solid currentColor}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #f2b705;outline-offset:2px}
+.msg{margin-top:12px;font-weight:600}.msg.error{color:var(--error)}.msg.ok{color:var(--ok)}
+.tabla{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--linea);vertical-align:top}
+th{color:var(--suave);font-weight:600}
+td select{width:auto}
+.fila{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:12px}
+.fila>div{flex:1;min-width:140px}
+.vacio{color:var(--suave)}
+.detalle{background:var(--fondo);border-radius:6px;padding:12px;margin-top:12px}
+.oculto{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Soporte interno</h1>
+  <div id="barra" class="oculto"><span id="quien"></span> <button class="sec" id="btnSalir">Cerrar sesión</button></div>
+</header>
+<main>
+
+<section id="vLogin">
+  <h2>Iniciar sesión</h2>
+  <label for="codigo">Código de usuario</label>
+  <input id="codigo" autocomplete="username">
+  <label for="clave">Contraseña</label>
+  <input id="clave" type="password" autocomplete="current-password">
+  <p><button id="btnEntrar">Entrar</button></p>
+  <div id="msgLogin" class="msg" role="alert"></div>
+</section>
+
+<div id="vSolicitante" class="oculto" style="display:none;gap:20px">
+  <section>
+    <h2>Nueva solicitud</h2>
+    <label for="titulo">Título</label>
+    <input id="titulo" maxlength="150">
+    <label for="categoria">Categoría</label>
+    <select id="categoria"></select>
+    <label for="descripcion">Descripción</label>
+    <textarea id="descripcion"></textarea>
+    <p><button id="btnCrear">Crear solicitud</button></p>
+    <div id="msgCrear" class="msg" role="alert"></div>
+  </section>
+  <section>
+    <h2>Mis solicitudes</h2>
+    <div class="tabla"><table>
+      <thead><tr><th>ID</th><th>Título</th><th>Estado</th><th>Última actualización</th><th></th></tr></thead>
+      <tbody id="misSolicitudes"></tbody>
+    </table></div>
+    <div id="detalle" class="detalle oculto"></div>
+  </section>
+</div>
+
+<section id="vCoordinador" class="oculto">
+  <h2>Todas las solicitudes</h2>
+  <div class="fila">
+    <div><label for="orden">Ordenar por</label>
+      <select id="orden"><option value="fecha">Fecha</option><option value="prioridad">Prioridad</option><option value="estado">Estado</option></select></div>
+    <div><label for="dir">Sentido</label>
+      <select id="dir"><option value="desc">Descendente</option><option value="asc">Ascendente</option></select></div>
+  </div>
+  <div class="tabla"><table>
+    <thead><tr><th>ID</th><th>Título</th><th>Categoría</th><th>Estado</th><th>Prioridad</th><th>Creada</th></tr></thead>
+    <tbody id="todas"></tbody>
+  </table></div>
+  <div id="msgCoord" class="msg" role="alert"></div>
+</section>
+
+<section id="vOtro" class="oculto">
+  <h2>Sin pantallas todavía</h2>
+  <p class="vacio">Las funciones de tu rol llegan en los siguientes sprints.</p>
+</section>
+
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const PRIORIDADES = ['Baja', 'Media', 'Alta'];
+
+async function api(url, opciones = {}) {
+  const r = await fetch(url, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    ...opciones,
+    body: opciones.body ? JSON.stringify(opciones.body) : undefined,
+  });
+  let datos = null;
+  try { datos = await r.json(); } catch (e) {}
+  return { ok: r.ok, estado: r.status, datos };
+}
+
+function mostrar(msg, el, texto, tipo) {
+  el.textContent = texto || '';
+  el.className = 'msg ' + (tipo || '');
+}
+const fecha = f => new Date(f).toLocaleString('es-CO');
+
+function celda(tr, texto) {
+  const td = document.createElement('td');
+  td.textContent = texto;
+  tr.appendChild(td);
+  return td;
+}
+
+function ocultarVistas() {
+  ['vLogin', 'vSolicitante', 'vCoordinador', 'vOtro'].forEach(v => { $(v).style.display = 'none'; });
+}
+
+function entrar(usuario) {
+  ocultarVistas();
+  $('barra').classList.remove('oculto');
+  $('quien').textContent = usuario.codigo + ' (' + usuario.rol + ')';
+  if (usuario.rol === 'Solicitante') {
+    $('vSolicitante').style.display = 'grid';
+    cargarCategorias();
+    cargarMias();
+  } else if (usuario.rol === 'Coordinador') {
+    $('vCoordinador').style.display = 'block';
+    cargarTodas();
+  } else {
+    $('vOtro').style.display = 'block';
+  }
+}
+
+function salir() {
+  ocultarVistas();
+  $('barra').classList.add('oculto');
+  $('vLogin').style.display = 'block';
+  $('clave').value = '';
+}
+
+// HU01: login y logout
+$('btnEntrar').onclick = async () => {
+  const r = await api('/api/auth/login', { method: 'POST', body: { codigo: $('codigo').value.trim(), password: $('clave').value } });
+  if (r.ok) { mostrar(null, $('msgLogin'), ''); entrar(r.datos); }
+  else mostrar(null, $('msgLogin'), 'Credenciales inválidas. Revisa tu código y contraseña.', 'error');
+};
+$('clave').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnEntrar').click(); });
+$('btnSalir').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); salir(); };
+
+// HU02: crear solicitud
+async function cargarCategorias() {
+  const r = await api('/api/solicitudes/categorias');
+  $('categoria').innerHTML = '';
+  const vacio = new Option('Elige una categoría', '');
+  $('categoria').appendChild(vacio);
+  (r.datos || []).forEach(c => $('categoria').appendChild(new Option(c, c)));
+}
+$('btnCrear').onclick = async () => {
+  const body = { titulo: $('titulo').value, descripcion: $('descripcion').value, categoria: $('categoria').value };
+  const r = await api('/api/solicitudes', { method: 'POST', body });
+  if (r.ok) {
+    mostrar(null, $('msgCrear'), 'Solicitud #' + r.datos.id + ' creada con estado ' + r.datos.estado + '.', 'ok');
+    $('titulo').value = ''; $('descripcion').value = ''; $('categoria').value = '';
+    cargarMias();
+  } else {
+    mostrar(null, $('msgCrear'), (r.datos && r.datos.errores ? r.datos.errores.join('. ') : 'No se pudo crear la solicitud.'), 'error');
+  }
+};
+
+// HU03: mis solicitudes y detalle
+async function cargarMias() {
+  const r = await api('/api/solicitudes');
+  const tbody = $('misSolicitudes');
+  tbody.innerHTML = '';
+  $('detalle').classList.add('oculto');
+  if (!r.ok || !r.datos.length) {
+    const tr = document.createElement('tr');
+    const td = celda(tr, 'Aún no tienes solicitudes. Crea la primera arriba.');
+    td.colSpan = 5; td.className = 'vacio';
+    tbody.appendChild(tr);
+    return;
+  }
+  r.datos.forEach(s => {
+    const tr = document.createElement('tr');
+    celda(tr, s.id); celda(tr, s.titulo); celda(tr, s.estado); celda(tr, fecha(s.actualizada_en));
+    const td = document.createElement('td');
+    const b = document.createElement('button');
+    b.className = 'sec'; b.textContent = 'Ver detalle';
+    b.onclick = () => verDetalle(s.id);
+    td.appendChild(b); tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+}
+async function verDetalle(id) {
+  const r = await api('/api/solicitudes/' + id);
+  const d = $('detalle');
+  d.innerHTML = '';
+  if (!r.ok) { d.textContent = 'No se encontró la solicitud.'; }
+  else {
+    const s = r.datos;
+    [['Título', s.titulo], ['Categoría', s.categoria], ['Estado', s.estado],
+     ['Prioridad', s.prioridad || 'Sin asignar'], ['Descripción', s.descripcion],
+     ['Creada', fecha(s.creada_en)], ['Última actualización', fecha(s.actualizada_en)]].forEach(([k, v]) => {
+      const p = document.createElement('p');
+      const b = document.createElement('strong');
+      b.textContent = k + ': ';
+      p.appendChild(b); p.appendChild(document.createTextNode(v));
+      d.appendChild(p);
+    });
+  }
+  d.classList.remove('oculto');
+}
+
+// HU04: coordinador prioriza y ordena
+async function cargarTodas() {
+  const r = await api('/api/coordinacion/solicitudes?orden=' + $('orden').value + '&dir=' + $('dir').value);
+  const tbody = $('todas');
+  tbody.innerHTML = '';
+  if (!r.ok || !r.datos.length) {
+    const tr = document.createElement('tr');
+    const td = celda(tr, r.ok
+      ? 'Todavía no hay solicitudes.'
+      : 'No se pudo cargar la lista (error ' + r.estado + ').');
+    td.colSpan = 6;
+    td.className = 'vacio';
+    tbody.appendChild(tr);
+    return;
+  }
+  r.datos.forEach(s => {
+    const tr = document.createElement('tr');
+    celda(tr, s.id); celda(tr, s.titulo); celda(tr, s.categoria); celda(tr, s.estado);
+    const td = document.createElement('td');
+    const sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'Prioridad de la solicitud ' + s.id);
+    sel.appendChild(new Option('Sin asignar', ''));
+    PRIORIDADES.forEach(p => sel.appendChild(new Option(p, p)));
+    sel.value = s.prioridad || '';
+    sel.onchange = () => cambiarPrioridad(s.id, sel.value);
+    td.appendChild(sel); tr.appendChild(td);
+    celda(tr, fecha(s.creada_en));
+    tbody.appendChild(tr);
+  });
+}
+async function cambiarPrioridad(id, prioridad) {
+  if (!prioridad) { cargarTodas(); return; }
+  const r = await api('/api/coordinacion/solicitudes/' + id + '/prioridad', { method: 'PATCH', body: { prioridad } });
+  if (r.ok) mostrar(null, $('msgCoord'), 'Prioridad de la solicitud #' + id + ' guardada: ' + prioridad + '.', 'ok');
+  else mostrar(null, $('msgCoord'), 'No se pudo cambiar la prioridad.', 'error');
+  cargarTodas();
+}
+$('orden').onchange = cargarTodas;
+$('dir').onchange = cargarTodas;
+
+// Si ya hay sesión abierta, entrar directo
+api('/api/auth/yo').then(r => { if (r.ok) entrar(r.datos); });
+</script>
+</body>
+</html>
