@@ -37,5 +37,47 @@ router.post('/', requiereRol('Solicitante'), async (req, res) => {
 router.get('/categorias', (req, res) => {
   res.json(CATEGORIAS);
 });
+// Listar solo mis solicitudes
+router.get('/', requiereRol('Solicitante'), async (req, res) => {
+  try {
+    const resultado = await pool.query(
+      `SELECT id, titulo, categoria, estado, prioridad, creada_en, actualizada_en
+       FROM solicitudes
+       WHERE propietario_id = $1
+       ORDER BY actualizada_en DESC`,
+      [req.session.usuario.id]
+    );
+    res.json(resultado.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// Detalle de una de mis solicitudes
+router.get('/:id', requiereRol('Solicitante'), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(404).json({ error: 'Solicitud no encontrada' });
+    }
+
+    const resultado = await pool.query(
+      `SELECT id, titulo, descripcion, categoria, estado, prioridad,
+              propietario_id, creada_en, actualizada_en
+       FROM solicitudes
+       WHERE id = $1 AND propietario_id = $2`,
+      [id, req.session.usuario.id]
+    );
+
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({ error: 'Solicitud no encontrada' });
+    }
+    res.json(resultado.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
 
 module.exports = router;
