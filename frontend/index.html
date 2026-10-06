@@ -230,8 +230,11 @@ async function cargarTodas() {
   tbody.innerHTML = '';
   if (!r.ok || !r.datos.length) {
     const tr = document.createElement('tr');
-    const td = celda(tr, 'Todavía no hay solicitudes.');
-    td.colSpan = 6; td.className = 'vacio';
+    const td = celda(tr, r.ok
+      ? 'Todavía no hay solicitudes.'
+      : 'No se pudo cargar la lista (error ' + r.estado + ').');
+    td.colSpan = 6;
+    td.className = 'vacio';
     tbody.appendChild(tr);
     return;
   }

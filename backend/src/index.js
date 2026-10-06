@@ -1,14 +1,16 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const pool = require('./db');
 const authRoutes = require('./routes/auth');
-const { requiereRol } = require('./middleware/auth');
 const solicitudesRoutes = require('./routes/solicitudes');
 const coordinacionRoutes = require('./routes/coordinacion');
 
 const app = express();
+
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../../frontend')));
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -17,8 +19,6 @@ app.use(session({
 }));
 
 app.get('/salud', (req, res) => res.json({ estado: 'ok' }));
-app.use('/api/solicitudes', solicitudesRoutes);
-app.use('/api/coordinacion', coordinacionRoutes);
 
 app.get('/salud-bd', async (req, res) => {
   try {
@@ -31,11 +31,8 @@ app.get('/salud-bd', async (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-
-// Ruta temporal para probar el control por rol (se borra después)
-app.get('/api/prueba-coordinador', requiereRol('Coordinador'), (req, res) => {
-  res.json({ mensaje: 'Entraste como Coordinador' });
-});
+app.use('/api/solicitudes', solicitudesRoutes);
+app.use('/api/coordinacion', coordinacionRoutes);
 
 const PUERTO = process.env.PORT || 3000;
 app.listen(PUERTO, () => console.log(`Servidor en puerto ${PUERTO}`));
